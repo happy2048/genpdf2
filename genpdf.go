@@ -23,24 +23,34 @@ type PdfClient struct {
 type Options struct {
 	Host string `short:"H" long:"host" description:"give the server ip which is running wkhtmltopdf." default:"127.0.0.1"`
 	Port string `short:"P" long:"port" description:"give the server service listen port." default:"6660"`
-	PdfArgs string `short:"a" long:"args" description:"give the pandoc args,eg: '--toc -N'." default:""`
+	PdfArgs string `short:"a" long:"args" description:"give the pandoc args,eg: 'a::--toc -N' or 'c::--toc -N','a' \n is explained 'append','c' is explained 'change'." default:""`
+	LatexTemp string `short:"t" long:"template" description:"give the template file for pandoc." default:""`
 }
 func main() {
 	opt,args := NewOptions()
 	opt.Check(args)
-	PostGeneratePdfReq(args[0],opt.PdfArgs,opt.Host,opt.Port,args[1])
+	PostGeneratePdfReq(args[0],opt.PdfArgs,opt.LatexTemp,opt.Host,opt.Port,args[1])
 }
-func PostGeneratePdfReq(con,args,server,port,out string) {
+func PostGeneratePdfReq(con,args,temp,server,port,out string) {
 	url := "http://" + server + ":"+ port + "/generate"
 	data := make(map[string]string)
 	tmpdata,err := ioutil.ReadFile(con)
-	con = string(tmpdata)
 	if err != nil {
-		log.Printf("read file error,reason: %s\n",err.Error())
+		log.Printf("read %s failed,reason: %s\n",con,err.Error())
 		return 
+	}
+	con = string(tmpdata)
+	if temp != "" {
+		tdata,err := ioutil.ReadFile(temp)
+		if err != nil {
+			log.Printf("read %s failed,reason: %s\n",temp,err.Error())
+			return 
+		}
+		temp = string(tdata)
 	}
 	data["content"] = con
 	data["args"] = args
+	data["template"] = temp
 	bytesData,err := json.Marshal(data)
 	if err != nil {
 		log.Printf("json marshal failed,reason: %s\n",err.Error())

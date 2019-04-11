@@ -6,6 +6,7 @@ import(
 	"time"
 	"bytes"
 	"fmt"
+	"strings"
 	"net/http"
 	"encoding/json"
 	"io"
@@ -17,6 +18,7 @@ type HtmlInfo struct {
 	Type string `json: "type"`
 	Content string `json: "content"`
 	Args string `json: "args"`
+	Template string `json: "template"`
 	Name string `json: "name"`
 }
 type FileInfo struct {
@@ -30,7 +32,10 @@ type ReturnData struct {
 }
 func main() {
 	if GetOsEnv("PANDOC_CMD") == "" {
-		os.Setenv("PANDOC_CMD","pandoc  --listings --pdf-engine=xelatex -V fontsize=12pt --template=/root/template.tex")
+		os.Setenv("PANDOC_CMD","pandoc --pdf-engine=xelatex")
+	}
+	if GetOsEnv("PANDOC_DEFAULT_ARGS") == "" {
+		os.Setenv("PANDOC_DEFAULT_ARGS","-V fontsize=12pt  --listings ")
 	}
 	if GetOsEnv("TMP_PATH") == "" {
 		os.Setenv("TMP_PATH","/tmp/pdf")
@@ -76,9 +81,9 @@ func HandleHtml(w http.ResponseWriter,req *http.Request)  {
 		body,_ := ioutil.ReadAll(req.Body)
 		var htmlInfo HtmlInfo
 		if err := json.Unmarshal(body,&htmlInfo);err == nil {
-			pdf,err := CreatePdf(htmlInfo.Content,htmlInfo.Args)
+			pdf,err := CreatePdf(htmlInfo.Content,htmlInfo.Args,htmlInfo.Template)
 			if err != nil {
-				ReturnValue(w,"1100","",pdf)
+				ReturnValue(w,"1100","",err.Error())
 				return
 			}
 			ReturnValue(w,"1000",pdf,"")
@@ -91,20 +96,50 @@ func HandleHtml(w http.ResponseWriter,req *http.Request)  {
 		return
 	}
 }
-func CreatePdf(content,args string) (string,error) {
+func CreatePdf(content,args,template string) (string,error) {
 	fid := GetRandomString(10)
 	md := fid + ".md"
 	pdf := fid + ".pdf"
+	temp := fid + ".tex"
 	tmpPath := GetOsEnv("TMP_PATH")
+	if tmpPath == "" {
+		return "",fmt.Errorf("%s","tmp path is not found.")
+	}
 	err := ioutil.WriteFile(path.Join(GetOsEnv("TMP_PATH"),md),[]byte(content),os.ModeAppend)
 	if  err != nil {
 		return  "",err
 	}
-	var cmdStr string
-	if tmpPath == "" {
-		return "",fmt.Errorf("%s","tmp path is not found.")
+	if template != "" {
+		err := ioutil.WriteFile(path.Join(GetOsEnv("TMP_PATH"),temp),[]byte(template),os.ModeAppend)
+		if err != nil {
+			return "",err
+		}
 	}
-	cmdStr = GetOsEnv("PANDOC_CMD") + " " + args + " -o " + path.Join(GetOsEnv("TMP_PATH"),pdf) +  " "  +   path.Join(GetOsEnv("TMP_PATH"),md)
+	cmdStr := GetOsEnv("PANDOC_CMD")
+	if args != "" {
+		argsList := strings.Split(args,"::")
+		if len(argsList) == 2 {
+			if argsList[0] == "a" {
+				cmdStr +=  " " + argsList[1] + " " +  GetOsEnv("PANDOC_DEFAULT_ARGS")
+			}else if   argsList[0] == "c" {
+				cmdStr +=  " " + argsList[1]
+			}else {
+				log.Printf("warning: the format of args is invalid.\n")
+				cmdStr +=  " "  + GetOsEnv("PANDOC_DEFAULT_ARGS") 
+			}
+		}else {
+			return  "",fmt.Errorf("invalid format of pandoc options,you should give them like 'a:: --toc -N' or 'c:: --toc -N'")
+		}
+	}else {
+		cmdStr += " " + GetOsEnv("PANDOC_DEFAULT_ARGS")
+	}
+	if template != "" {
+		cmdStr += " --template=" + path.Join(GetOsEnv("TMP_PATH"),temp)
+	}else {
+		cmdStr += " --template=/root/template.tex"
+	}
+	cmdStr += " -o " + path.Join(GetOsEnv("TMP_PATH"),pdf) +  " "  +   path.Join(GetOsEnv("TMP_PATH"),md)
+	log.Printf("current cmd: %s\n",cmdStr)
 	out,stderr,err := RunCmd(cmdStr)
 	log.Printf("\n%s\n",stderr)
 	log.Printf("\n%s\n",out)
