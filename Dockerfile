@@ -13,11 +13,7 @@ RUN cd /root && \
 	chmod +x /usr/local/bin/genpdf-server && \
 	cp -ar genpdf2/fonts /usr/share
 	
-#ADD template.tex /root/template.tex
-#ADD genpdf-server /usr/bin/genpdf-server
-#ADD fonts /usr/share/fonts
-RUN chmod +x /usr/bin/genpdf-server
 ENV GOROOT /usr/local/go
 ENV PATH /usr/local/go/bin:$PATH
-CMD ["/usr/bin/genpdf-server"]
+CMD ["/usr/local/bin/genpdf-server"]
 
