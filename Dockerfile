@@ -11,7 +11,7 @@ RUN cd /root && \
 	cp genpdf2/template.tex /root/template.tex && \
 	cp genpdf2/genpdf-server /usr/local/bin && \
 	chmod +x /usr/local/bin/genpdf-server && \
-	cp -ar genpdf2/fonts /usr/share && \
+	cp -ar genpdf2/fonts /usr/share
 	
 #ADD template.tex /root/template.tex
 #ADD genpdf-server /usr/bin/genpdf-server
